@@ -89,7 +89,7 @@ It is clear from the confusion matrices that the random forest, performing at 98
 ```{r plots, cache=TRUE, echo=FALSE}
 rfrelvars <- varImp(rfmod)
 plot(rfrelvars, main = "Top 25 Most Impactful Variables to Random Forest Model", top = 25)
-plot(rfmod$finalModel, main = "Test")
+plot(rfmod$finalModel, main = "Error Rates")
 ```
 
 ## Final Test
