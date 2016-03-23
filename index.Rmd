@@ -1,0 +1,109 @@
+---
+title: "Determining Level of Performance in Weight Lifting"
+author: "Rebecca Acevedo"
+date: "March 22, 2016"
+output: html_document
+---
+
+## Overview
+The purpose of this exercise is to examine a data set and create a prediction model to identify when a person is performing the task of a Unilateral Dumbbell Bicep Curl.  The data utilized in this exploration was obtained from the Weight Lifting Exercises Dataset (See Reference 1), which provides data that measures through the use of accelerometers of six men performing the Unilateral Dumbbell Bicep Curl to exact specifications, both correctly and incorrectly.
+
+##Initial Set-up
+### R Set-up
+```{r setup, warning=FALSE}
+library(ggplot2)
+library(caret)
+library(pROC)
+```
+### Data Set-up
+The data was downloaded on March 21, 2015 from the predictive machine learning library on cloudfront.  There are two sets of data, the training set and the testing set. 
+#### Training Data
+The training set of data is to be used for creating the model.
+```{r training, cache = TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",  "pml-training.csv")
+data <- read.csv("pml-training.csv", na.strings=c("#DIV/0!"), row.names = 1)
+data$classe <- factor(data$classe)
+```
+#### Testing Data
+The test set is to only be used once the model is final.
+```{r test data, cache=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv")
+testing <- read.csv("pml-testing.csv", na.strings=c("#DIV/0!"), row.names = 1)
+```
+#### Preparing Test Data
+A first glance is taken of the data to determine the volume of data.
+```{r dims}
+dim(data)
+```
+From the dimensions, we can see there are over 154 columns of data. In order to get a good prediction, the data needed to be narrowed down. An overview of the data demonstrated that the first 6 columns were inconsequential to a prediction algorythim, as they were not measures, rather they were metadata regarding the subjects, and the time at which the tests were performed. Thus these columns were removed.
+```{r }
+data <- data[7:159]
+```
+There still however, remained too many columns for a good prediction. The overview also revealed that there were a number of columns where the data collected was minimal or non-existant. The next step to reducing the columns was therefore to remove any columns where the percentage of captured data was less than 90%.
+```{r ninty, cache = TRUE}
+min <- dim(data)[1]*.9
+keep <- !apply(data, 2, function(x) sum(is.na(x)) > min || sum(x=="")>min || sum(x=="NA")>min)
+data <- data[,keep]
+```
+
+This resulted in a far more manageble data set of 53 columns. Having removed almost two-thirds of the columns, the next step was to test the available data.
+
+## Method
+
+As it is unclear which predictive method will produce the best model cross-validation was used to evaluate results before determining a final model. Therefore, the first step is to divide the training data set further, into an initial training set and a cross-validation set. Sixty percent of the data as used for a training set, and the remaining 40 percent was used for cross validation.
+
+``` {r split, cache=TRUE}
+inTrain <- createDataPartition(data$classe, p=.6)[[1]]
+traininga <- data[inTrain,]
+cross <- data[-inTrain,]
+```
+
+### Generalized Boosted Regression Model
+The first model created was the generalized boosted regression model.
+```{r gbm, cache=TRUE, results='hide'}
+gbmmod <- train(classe ~ ., data=traininga, method="gbm")
+gbmpred <- predict(gbmmod, cross)
+```
+### Linear Discriminate Analysis
+The second modes was the linear discriminate analysis.
+```{r lda, cache=TRUE, results='hide'}
+ldamod <- train(classe ~ ., data=traininga, method="lda")
+ldapred <- predict(ldamod, cross)
+```
+### Random Forest
+The final model created was based on the random forest method.
+```{r rf, cache=TRUE, results='hide', warning=FALSE}
+rfmod <- train(classe ~ ., data=traininga, method="rf")
+rfpred <- predict(rfmod, cross)
+```
+## Model Evaluation
+
+In order to evaluate the best model for the final data set.  Confusion matricies were reviewed for each of fthe models. 
+```{r confusion}
+confusionMatrix(gbmpred, cross$classe)
+confusionMatrix(ldapred, cross$classe)
+confusionMatrix(rfpred, cross$classe)
+```
+It is clear from the confusion matrices that the random forest, performing at 98.9% accuracy, with an out of sample error rate of 1.07%, is the best model to apply to this data. With a quick review of the most impactful data points, it is interesting to see that roll_belt plays such an integral part in the process. 
+
+```{r plots, cache=TRUE, echo=FALSE}
+rfrelvars <- varImp(rfmod)
+plot(rfrelvars, main = "Top 25 Most Impactful Variables to Random Forest Model", top = 25)
+plot(rfmod$finalModel, main = "Error Rates")
+```
+
+## Final Test
+
+For the final step of the project, after the decision was made to use the random forest model for predicting, the model was run against the testing data
+
+```{r final test}
+test <- predict(rfmod, newdata=testing)
+test
+```
+
+## References
+
+1. Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz43ag0zkAF
+
+setwd("C:/Users/racevedo/Desktop/DataScienceCert/Practical Machine Learning")
